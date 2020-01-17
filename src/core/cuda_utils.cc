@@ -85,7 +85,20 @@ CopyBuffer(
   // the src buffer is valid.
   if ((src_memory_type != TRTSERVER_MEMORY_GPU) &&
       (dst_memory_type != TRTSERVER_MEMORY_GPU)) {
+#ifndef TRTIS_ENABLE_GPU
     memcpy(dst, src, byte_size);
+#else
+    auto err =
+        cudaMemcpyAsync(dst, src, byte_size, cudaMemcpyHostToHost, cuda_stream);
+    if (err != cudaSuccess) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          msg + ": failed to use CUDA copy : " +
+              std::string(cudaGetErrorString(err)));
+    } else {
+      *cuda_used = true;
+    }
+#endif  // TRTIS_ENABLE_GPU
   } else {
 #ifdef TRTIS_ENABLE_GPU
     // [TODO] use cudaMemcpyDefault if UVM is supported for the device
